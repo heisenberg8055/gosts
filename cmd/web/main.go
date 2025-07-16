@@ -8,23 +8,24 @@ import (
 	"os"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/heisenberg8055/gosts/internal/models"
 )
 
 type application struct {
 	errorLog *log.Logger
 	infoLog  *log.Logger
+	snippets *models.SnippetModel
 }
 
 func main() {
 
 	addr := flag.String("addr", ":4000", "Http network port")
-	dsn := flag.String("dsn", "web:pass@/gosts?parseTime=true", "MySQL Data Source Name")
+	dsn := flag.String("dsn", "web:0414@/gosts?parseTime=true", "MySQL Data Source Name")
 
 	flag.Parse()
 
 	infoLog := log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
-	app := &application{errorLog: errorLog, infoLog: infoLog}
 
 	db, err := openDB(*dsn)
 
@@ -33,6 +34,8 @@ func main() {
 	}
 
 	defer db.Close()
+
+	app := &application{errorLog: errorLog, infoLog: infoLog, snippets: &models.SnippetModel{DB: db}}
 
 	srv := http.Server{
 		Addr:     *addr,

@@ -1,11 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
 	"path/filepath"
 	"strconv"
+
+	"github.com/heisenberg8055/gosts/internal/models"
 )
 
 type neuteredFileSystem struct {
@@ -13,6 +16,16 @@ type neuteredFileSystem struct {
 }
 
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
+
+	snippets, err := app.snippets.Latest()
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	for _, snippet := range snippets {
+		fmt.Fprintf(w, "%+v\n", snippet)
+	}
 
 	files := []string{
 		"./ui/html/base.html",
@@ -32,7 +45,15 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) createSnippet(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Not Right", http.StatusMethodNotAllowed)
+	title := "O snail"
+	content := "O snail\nClimb Mount Fuji,\nBut slowly, slowly!\n\n– Kobayashi Issa"
+	expires := 7
+	id, err := app.snippets.Insert(title, content, expires)
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/snippet/view?id=%d", id), http.StatusSeeOther)
 }
 
 func (app *application) viewSnippet(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +62,16 @@ func (app *application) viewSnippet(w http.ResponseWriter, r *http.Request) {
 		app.notFound(w)
 		return
 	}
-	fmt.Fprintf(w, "ID: %d\n", id)
+	snippet, err := app.snippets.Get(id)
+	if err != nil {
+		if errors.Is(err, models.ErrNoRecord) {
+			app.notFound(w)
+		} else {
+			app.serverError(w, err)
+		}
+		return
+	}
+	fmt.Fprintf(w, "%+v", snippet)
 }
 
 func (nfs neuteredFileSystem) Open(path string) (http.File, error) {
