@@ -43,6 +43,6 @@ func (app *application) render(w http.ResponseWriter, status int, page string, d
 	buf.WriteTo(w)
 }
 
-func (app *application) newTemplateData(r *http.Request) *templateData {
+func (app *application) newTemplateData() *templateData {
 	return &templateData{CurrentYear: time.Now().Year()}
 }
