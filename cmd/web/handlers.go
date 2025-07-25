@@ -48,7 +48,6 @@ func (app *application) createSnippet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) createSnippetPost(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	err := r.ParseForm()
 	if err != nil {
 		app.clientError(w, http.StatusBadRequest)
@@ -139,6 +138,16 @@ type userSignupForm struct {
 }
 
 func (app *application) userSignup(w http.ResponseWriter, r *http.Request) {
+	data := app.newTemplateData(r)
+	data.Form = userSignupForm{}
+	app.render(w, http.StatusOK, "signup.html", data)
+}
+
+func (app *application) userSignupPost(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		app.clientError(w, http.StatusBadRequest)
+	}
 
 	formData := userSignupForm{
 		Name:     r.PostForm.Get("name"),
@@ -146,13 +155,34 @@ func (app *application) userSignup(w http.ResponseWriter, r *http.Request) {
 		Password: r.PostForm.Get("password"),
 	}
 
-	data := app.newTemplateData(r)
-	data.Form = formData
-	app.render(w, http.StatusOK, "signup.html", data)
-}
+	formData.CheckField(validator.NotBlank(formData.Name), "name", "This field cannot be blank")
+	formData.CheckField(validator.NotBlank(formData.Email), "email", "This field cannot be blank")
+	formData.CheckField(validator.Matches(formData.Email, validator.EmailRegex), "email", "This field must be a valid email address")
+	formData.CheckField(validator.NotBlank(formData.Password), "password", "This field cannot be blank")
+	formData.CheckField(validator.MinChars(formData.Password, 8), "password", "This field must be alteast 8 character long")
+	formData.CheckField(validator.MaxChars(formData.Password, 36), "password", "This field must be less than 36 character long")
 
-func (app *application) userSignupPost(w http.ResponseWriter, r *http.Request) {
+	if !formData.Valid() {
+		data := app.newTemplateData(r)
+		data.Form = formData
+		app.render(w, http.StatusUnprocessableEntity, "signup.html", data)
+		return
+	}
 
+	err = app.users.Insert(formData.Name, formData.Email, formData.Password)
+	if err != nil {
+		if errors.Is(err, models.ErrDuplicateEmail) {
+			formData.AddFieldError("email", "Email address is already in use")
+			data := app.newTemplateData(r)
+			data.Form = formData
+			app.render(w, http.StatusUnprocessableEntity, "signup.html", data)
+		} else {
+			app.serverError(w, err)
+		}
+		return
+	}
+	app.sessionManager.Put(r.Context(), "flash", "Your Signup is successful. Please log in.")
+	http.Redirect(w, r, "/user/login", http.StatusSeeOther)
 }
 
 func (app *application) userLogin(w http.ResponseWriter, r *http.Request) {
@@ -160,7 +190,7 @@ func (app *application) userLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) userLoginPost(w http.ResponseWriter, r *http.Request) {
-
+	fmt.Fprint(w, "TEST")
 }
 
 func (app *application) userLogoutPost(w http.ResponseWriter, r *http.Request) {
