@@ -11,6 +11,7 @@ func (app *application) routes() http.Handler {
 	fileServer := http.FileServer(neuteredFileSystem{http.FS(ui.Files)})
 	mux := http.NewServeMux()
 	mux.Handle("GET /static/", fileServer)
+	mux.Handle("GET /healthz", http.HandlerFunc(healthCheck))
 
 	noAuthHandler := New(app.sessionManager.LoadAndSave, noSurf, app.authenticate)
 	authHandler := noAuthHandler.Append(app.requireAuthentication)
